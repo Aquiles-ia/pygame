@@ -1,43 +1,51 @@
 import pygame
 import os
 import random
-from constants import ANCHO, ALTO, VEL_ENEMIGO
+from constants import ANCHO_PANTALLA, ALTO_PANTALLA, VELOCIDAD_ENEMIGO
 
 # Clase para los enemigos que caen desde arriba
 class Enemigo(pygame.sprite.Sprite):
     def __init__(self):
+        # Inicializamos el Sprite
         super().__init__()
-        # Buscamos la imagen del enemigo
-        ruta_imagen = os.path.join("assets", "images", "enemigo.png")
+        
+        # Ruta de la imagen del enemigo
+        ruta_enemigo = os.path.join("assets", "images", "enemigo.png")
         
         try:
-            # Cargamos la imagen y activamos la transparencia del color negro
-            self.image = pygame.image.load(ruta_imagen).convert()
-            self.image.set_colorkey((0, 0, 0))
-        except:
-            # Si falla la carga, dibujamos un cuadrado rojo
-            self.image = pygame.Surface((50, 50))
+            # ¡GENIAL! Tu imagen ya tiene transparencia real. 
+            # Usamos convert_alpha() para un resultado perfecto.
+            imagen_base = pygame.image.load(ruta_enemigo).convert_alpha()
+            
+            # Giramos la nave 180 grados para que mire hacia abajo al jugador
+            self.image = pygame.transform.rotate(imagen_base, 180)
+        except Exception as error:
+            print(f"Error al cargar imagen del enemigo: {error}")
+            # Si falla, usamos un cuadrado rojo
+            self.image = pygame.Surface((40, 40))
             self.image.fill((255, 0, 0))
             
-        # Redimensionamos al enemigo
+        # La escalamos a 50x50 píxeles
         self.image = pygame.transform.scale(self.image, (50, 50))
         self.rect = self.image.get_rect()
         
-        # Llamamos a esta función para darle una posición inicial aleatoria
+        # Máscara para colisiones precisas píxel por píxel
+        self.mask = pygame.mask.from_surface(self.image)
+        
+        # Lo mandamos a su posición inicial
         self.reiniciar_posicion()
 
     def reiniciar_posicion(self):
-        """Coloca al enemigo en la parte superior en una X aleatoria"""
-        self.rect.x = random.randrange(ANCHO - self.rect.width)
-        # Aparece un poco fuera de pantalla por arriba (-150 a -50)
+        """Manda al enemigo arriba en un sitio aleatorio"""
+        self.rect.x = random.randrange(ANCHO_PANTALLA - self.rect.width)
         self.rect.y = random.randrange(-150, -50)
-        # Le damos una velocidad aleatoria para que no bajen todos igual
-        self.velocidad_y = random.randint(VEL_ENEMIGO, VEL_ENEMIGO + 2)
+        # Velocidad de caída proporcional a la constante
+        self.velocidad_caida = VELOCIDAD_ENEMIGO + random.randint(0, 2)
 
     def update(self):
-        """Mueve al enemigo hacia abajo en cada fotograma"""
-        self.rect.y += self.velocidad_y
+        """Mueve al enemigo hacia abajo"""
+        self.rect.y += self.velocidad_caida
         
-        # Si el enemigo llega al fondo de la pantalla, vuelve a aparecer arriba
-        if self.rect.top > ALTO + 10:
+        # Si el enemigo se sale por abajo, vuelve a aparecer arriba
+        if self.rect.top > ALTO_PANTALLA:
             self.reiniciar_posicion()

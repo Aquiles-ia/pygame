@@ -2,215 +2,211 @@ import pygame
 import sys
 import os
 
-# --- PREPARACIÓN DEL ENTORNO ---
-# Esta línea asegura que Python busque los archivos (imágenes, sonidos) siempre en la carpeta del juego
+# --- PREPARACIÓN DEL DIRECTORIO ---
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Importamos nuestras propias configuraciones y clases
+# Importamos constantes y clases
 from constants import *
 from Jugador import Jugador
 from Enemigo import Enemigo
 
-# Esta clase es el "cerebro" del juego. Controla los puntos, las pantallas y los sprites.
+# Clase que gestiona el funcionamiento global del juego
 class GerenteJuego:
-    def __init__(self, pantalla):
-        self.pantalla = pantalla
-        self.estado = MENU  # Empezamos en el menú principal
-        self.puntos = 0
+    def __init__(self, ventana_juego):
+        self.ventana = ventana_juego
+        self.estado_actual = MENU
+        self.puntuacion_total = 0
         
-        # --- CARGA DE FUENTES (LETRAS) ---
-        ruta_letra = os.path.join("assets", "fonts", "letra.ttf")
-        if os.path.exists(ruta_letra):
-            self.fuente_titulo = pygame.font.Font(ruta_letra, 64)
-            self.fuente_texto = pygame.font.Font(ruta_letra, 32)
+        # --- CARGA DE RECURSOS (Letras y Fondos) ---
+        ruta_fuente = os.path.join("assets", "fonts", "letra.ttf")
+        if os.path.exists(ruta_fuente):
+            self.fuente_grande = pygame.font.Font(ruta_fuente, 64)
+            self.fuente_pequeña = pygame.font.Font(ruta_fuente, 32)
         else:
-            # Si no hay archivo de letra, usamos la genérica del sistema (Arial)
-            self.fuente_titulo = pygame.font.SysFont("Arial", 64, bold=True)
-            self.fuente_texto = pygame.font.SysFont("Arial", 32)
+            self.fuente_grande = pygame.font.SysFont("Arial", 64, bold=True)
+            self.fuente_pequeña = pygame.font.SysFont("Arial", 32)
             
-        # --- CARGA DE FONDOS ---
         try:
             self.fondo_menu = pygame.image.load(os.path.join("assets", "images", "menu_fondo.png")).convert()
-            self.fondo_menu = pygame.transform.scale(self.fondo_menu, (ANCHO, ALTO))
+            self.fondo_menu = pygame.transform.scale(self.fondo_menu, (ANCHO_PANTALLA, ALTO_PANTALLA))
             self.fondo_juego = pygame.image.load(os.path.join("assets", "images", "juego_fondo.png")).convert()
-            self.fondo_juego = pygame.transform.scale(self.fondo_juego, (ANCHO, ALTO))
+            self.fondo_juego = pygame.transform.scale(self.fondo_juego, (ANCHO_PANTALLA, ALTO_PANTALLA))
         except:
-            # Fondos de emergencia si las imágenes no cargan
-            self.fondo_menu = pygame.Surface((ANCHO, ALTO))
+            self.fondo_menu = pygame.Surface((ANCHO_PANTALLA, ALTO_PANTALLA))
             self.fondo_menu.fill(NEGRO)
-            self.fondo_juego = pygame.Surface((ANCHO, ALTO))
+            self.fondo_juego = pygame.Surface((ANCHO_PANTALLA, ALTO_PANTALLA))
             self.fondo_juego.fill((0, 0, 50))
             
-        # Preparamos las listas de objetos
-        self.reiniciar_partida()
+        self.iniciar_partida_nueva()
+        self.gestionar_musica("menu_music.mp3")
+
+    def gestionar_musica(self, nombre_archivo_musica):
+        """Reproduce música de fondo"""
+        ruta_audio = os.path.join("assets", "sounds", nombre_archivo_musica)
+        if os.path.exists(ruta_audio):
+            pygame.mixer.music.load(ruta_audio)
+            pygame.mixer.music.play(-1)
+
+    def iniciar_partida_nueva(self):
+        """Limpia los datos para comenzar de cero"""
+        self.puntuacion_total = 0
+        self.grupo_todos_los_elementos = pygame.sprite.Group()
+        self.grupo_enemigos = pygame.sprite.Group()
+        self.grupo_balas = pygame.sprite.Group()
         
-        # Iniciamos la música del menú
-        self.reproducir_musica("menu_music.mp3")
-
-    def reproducir_musica(self, nombre_archivo):
-        """Carga y reproduce música de fondo en bucle"""
-        ruta = os.path.join("assets", "sounds", nombre_archivo)
-        if os.path.exists(ruta):
-            pygame.mixer.music.load(ruta)
-            pygame.mixer.music.play(-1) # El -1 significa que se repite infinito
-
-    def reiniciar_partida(self):
-        """Pone todo a cero para empezar una partida nueva"""
-        self.puntos = 0
-        # Los grupos de sprites son listas inteligentes de Pygame
-        self.todos_los_sprites = pygame.sprite.Group() # Para dibujar y actualizar todo a la vez
-        self.enemigos = pygame.sprite.Group()          # Solo para detectar choques con enemigos
-        self.balas = pygame.sprite.Group()             # Solo para los disparos
+        self.nave_jugador = Jugador()
+        self.grupo_todos_los_elementos.add(self.nave_jugador)
         
-        # Creamos al jugador
-        self.jugador = Jugador()
-        self.todos_los_sprites.add(self.jugador)
+        for i in range(ENEMIGOS_INICIALES):
+            enemigo_nuevo = Enemigo()
+            self.grupo_enemigos.add(enemigo_nuevo)
+            self.grupo_todos_los_elementos.add(enemigo_nuevo)
+
+    def escribir_texto(self, mensaje, fuente, color, coord_x, coord_y):
+        """Dibuja texto en la pantalla"""
+        dibujo_texto = fuente.render(mensaje, True, color)
+        rect_texto = dibujo_texto.get_rect()
+        rect_texto.center = (coord_x, coord_y)
+        self.ventana.blit(dibujo_texto, rect_texto)
+
+    def dibujar_salud_jugador(self, x, y, salud):
+        """Dibuja una barra de vida roja muy simple"""
+        if salud < 0: salud = 0
+        ANCHO_MAXIMO = 200
+        ALTO_BARRA = 20
+        relleno = (salud / VIDA_JUGADOR_MAXIMA) * ANCHO_MAXIMO
         
-        # Creamos los primeros enemigos del juego
-        for _ in range(ENEMIGOS_INICIALES):
-            nuevo_enemigo = Enemigo()
-            self.enemigos.add(nuevo_enemigo)
-            self.todos_los_sprites.add(nuevo_enemigo)
+        rectangulo_fondo = pygame.Rect(x, y, ANCHO_MAXIMO, ALTO_BARRA)
+        rectangulo_salud = pygame.Rect(x, y, relleno, ALTO_BARRA)
+        
+        # Barra roja de salud
+        pygame.draw.rect(self.ventana, ROJO, rectangulo_salud)
+        # Borde blanco
+        pygame.draw.rect(self.ventana, BLANCO, rectangulo_fondo, 2)
 
-    def dibujar_texto(self, texto, fuente, color, x, y):
-        """Función auxiliar para escribir texto centrado fácilmente"""
-        imagen_texto = fuente.render(texto, True, color)
-        rectangulo = imagen_texto.get_rect()
-        rectangulo.center = (x, y)
-        self.pantalla.blit(imagen_texto, rectangulo)
-
-    def ejecutar_menu(self):
-        """Dibuja el menú y espera a que el usuario pulse ESPACIO"""
-        self.pantalla.blit(self.fondo_menu, (0, 0))
-        self.dibujar_texto("SPACE ADVENTURE", self.fuente_titulo, BLANCO, ANCHO//2, 150)
-        self.dibujar_texto("Presiona ESPACIO para comenzar", self.fuente_texto, VERDE, ANCHO//2, 450)
+    def controlar_menu(self):
+        """Dibuja el menú principal"""
+        self.ventana.blit(self.fondo_menu, (0, 0))
+        self.escribir_texto("SPACE ADVENTURE", self.fuente_grande, BLANCO, ANCHO_PANTALLA//2, 150)
+        self.escribir_texto("Presiona ESPACIO para empezar", self.fuente_pequeña, VERDE, ANCHO_PANTALLA//2, 450)
         
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT: return False
             if evento.type == pygame.KEYDOWN:
                 if evento.key == pygame.K_SPACE:
-                    self.reiniciar_partida()
-                    self.estado = JUEGO
-                    self.reproducir_musica("game_music.mp3") # Cambiamos a música de acción
+                    self.iniciar_partida_nueva()
+                    self.estado_actual = JUEGO
+                    self.gestionar_musica("game_music.mp3")
         return True
 
-    def ejecutar_juego(self):
-        """La lógica principal mientras estás jugando"""
-        self.pantalla.blit(self.fondo_juego, (0, 0))
+    def controlar_juego(self):
+        """Dibuja y actualiza la acción del juego"""
+        self.ventana.blit(self.fondo_juego, (0, 0))
         
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT: return False
-            
-            # Crear un enemigo nuevo cuando el temporizador lo indique
-            if evento.type == CREAR_ENEMIGO:
-                nuevo_enemigo = Enemigo()
-                self.enemigos.add(nuevo_enemigo)
-                self.todos_los_sprites.add(nuevo_enemigo)
-                
-            # Disparar al pulsar ESPACIO
+            if evento.type == EVENTO_CREAR_ENEMIGO:
+                nuevo = Enemigo()
+                self.grupo_enemigos.add(nuevo)
+                self.grupo_todos_los_elementos.add(nuevo)
             if evento.type == pygame.KEYDOWN:
                 if evento.key == pygame.K_SPACE:
-                    nueva_bala = self.jugador.disparar()
-                    self.balas.add(nueva_bala)
-                    self.todos_los_sprites.add(nueva_bala)
-                # Pausar el juego con la letra P
-                if evento.key == pygame.K_p: self.estado = PAUSA
+                    bala = self.nave_jugador.disparar()
+                    self.grupo_balas.add(bala)
+                    self.grupo_todos_los_elementos.add(bala)
+                if evento.key == pygame.K_p: self.estado_actual = PAUSA
         
-        # Actualizamos la posición de todos los objetos
-        self.todos_los_sprites.update()
+        self.grupo_todos_los_elementos.update()
         
-        # --- DETECCIÓN DE COLISIONES ---
-        # ¿Han chocado las balas con los enemigos?
-        # groupcollide(grupo1, grupo2, borrar1, borrar2)
-        impactos = pygame.sprite.groupcollide(self.enemigos, self.balas, True, True)
-        for _ in impactos:
-            self.puntos += 10 # 10 puntos por cada nave destruida
-            # Creamos un nuevo enemigo para que la pantalla no se quede vacía
+        # Colisiones precisas con máscaras
+        for proyectil in self.grupo_balas:
+            golpeados = pygame.sprite.spritecollide(proyectil, self.grupo_enemigos, True, pygame.sprite.collide_mask)
+            if golpeados:
+                proyectil.kill()
+                for e in golpeados:
+                    self.puntuacion_total += 10
+                    enemigo_respawn = Enemigo()
+                    self.grupo_enemigos.add(enemigo_respawn)
+                    self.grupo_todos_los_elementos.add(enemigo_respawn)
+
+        colisiones_jugador = pygame.sprite.spritecollide(self.nave_jugador, self.grupo_enemigos, True, pygame.sprite.collide_mask)
+        for choque in colisiones_jugador:
+            # Quitamos vida usando la nueva función que has creado
+            self.nave_jugador.recibir_danio(DANIO_POR_ENEMIGO)
             nuevo_enemigo = Enemigo()
-            self.enemigos.add(nuevo_enemigo)
-            self.todos_los_sprites.add(nuevo_enemigo)
+            self.grupo_enemigos.add(nuevo_enemigo)
+            self.grupo_todos_los_elementos.add(nuevo_enemigo)
             
-        # ¿Ha chocado el jugador contra algún enemigo?
-        if pygame.sprite.spritecollide(self.jugador, self.enemigos, False):
-            self.estado = GAMEOVER # Si chocamos, se acaba la partida
+            # Comprobamos la vida con el nuevo método
+            if self.nave_jugador.get_vida() <= 0:
+                self.estado_actual = GAMEOVER
             
-        # Dibujamos todo en la pantalla
-        self.todos_los_sprites.draw(self.pantalla)
-        # Mostramos los puntos arriba a la izquierda
-        self.dibujar_texto(f"Puntos: {self.puntos}", self.fuente_texto, BLANCO, 100, 30)
+        # Dibujamos todos los personajes en su nueva posición
+        self.grupo_todos_los_elementos.draw(self.ventana)
+        
+        # Dibujamos la interfaz (puntos y salud usando el nuevo método)
+        self.escribir_texto(f"Puntos: {self.puntuacion_total}", self.fuente_pequeña, BLANCO, ANCHO_PANTALLA - 100, 30)
+        self.escribir_texto("VIDA:", self.fuente_pequeña, BLANCO, 60, 30)
+        self.dibujar_salud_jugador(120, 20, self.nave_jugador.get_vida())
         
         return True
 
-    def ejecutar_pausa(self):
-        """Mantiene el juego detenido hasta pulsar P de nuevo"""
-        # Dibujamos el estado actual del juego de fondo
-        self.pantalla.blit(self.fondo_juego, (0, 0))
-        self.todos_los_sprites.draw(self.pantalla)
-        
-        # Ponemos el cartel de PAUSA encima
-        self.dibujar_texto("PAUSA", self.fuente_titulo, ROJO, ANCHO//2, ALTO//2)
-        self.dibujar_texto("Presiona P para continuar", self.fuente_texto, BLANCO, ANCHO//2, ALTO//2 + 80)
+    def controlar_pausa(self):
+        """Pantalla de pausa"""
+        self.ventana.blit(self.fondo_juego, (0, 0))
+        self.grupo_todos_los_elementos.draw(self.ventana)
+        self.escribir_texto("PAUSA", self.fuente_grande, ROJO, ANCHO_PANTALLA//2, ALTO_PANTALLA//2)
+        self.escribir_texto("Pulsa P para volver", self.fuente_pequeña, BLANCO, ANCHO_PANTALLA//2, ALTO_PANTALLA//2 + 80)
         
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT: return False
             if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_p: self.estado = JUEGO
+                if evento.key == pygame.K_p: self.estado_actual = JUEGO
         return True
 
-    def ejecutar_gameover(self):
-        """Muestra la puntuación final y permite reiniciar"""
-        self.pantalla.fill(NEGRO)
-        self.dibujar_texto("GAME OVER", self.fuente_titulo, ROJO, ANCHO//2, 150)
-        self.dibujar_texto(f"Puntos Finales: {self.puntos}", self.fuente_texto, BLANCO, ANCHO//2, 250)
-        self.dibujar_texto("R para Reintentar - M para Menú", self.fuente_texto, VERDE, ANCHO//2, 450)
+    def controlar_gameover(self):
+        """Pantalla final de derrota"""
+        self.ventana.fill(NEGRO)
+        self.escribir_texto("FIN DE LA PARTIDA", self.fuente_grande, ROJO, ANCHO_PANTALLA//2, 150)
+        self.escribir_texto(f"Puntuación: {self.puntuacion_total}", self.fuente_pequeña, BLANCO, ANCHO_PANTALLA//2, 250)
+        self.escribir_texto("R: Reintentar  -  M: Menú", self.fuente_pequeña, VERDE, ANCHO_PANTALLA//2, 450)
         
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT: return False
             if evento.type == pygame.KEYDOWN:
-                # 'R' reinicia la partida directamente
                 if evento.key == pygame.K_r:
-                    self.reiniciar_partida()
-                    self.estado = JUEGO
-                    self.reproducir_musica("game_music.mp3")
-                # 'M' te lleva al menú inicial
-                if evento.key == evento.key == pygame.K_m:
-                    self.estado = MENU
-                    self.reproducir_musica("menu_music.mp3")
+                    self.iniciar_partida_nueva()
+                    self.estado_actual = JUEGO
+                    self.gestionar_musica("game_music.mp3")
+                if evento.key == pygame.K_m:
+                    self.estado_actual = MENU
+                    self.gestionar_musica("menu_music.mp3")
         return True
 
-def main():
-    # Inicialización básica de Pygame
+def bucle_principal():
+    """Arranque del juego y bucle de repetición"""
     pygame.init()
-    pygame.mixer.init() # Para el sonido
+    pygame.mixer.init()
+    ventana = pygame.display.set_mode((ANCHO_PANTALLA, ALTO_PANTALLA))
+    pygame.display.set_caption("SPACE ADVENTURE")
+    reloj = pygame.time.Clock()
     
-    # Creamos la ventana con el tamaño de constants.py
-    pantalla = pygame.display.set_mode((ANCHO, ALTO))
-    pygame.display.set_caption("SPACE ADVENTURE - PROYECTO 3")
-    reloj = pygame.time.Clock() # Para controlar los FPS
+    juego = GerenteJuego(ventana)
+    pygame.time.set_timer(EVENTO_CREAR_ENEMIGO, TIEMPO_APARICION_ENEMIGO)
     
-    # Creamos el objeto principal que gestiona todo
-    juego = GerenteJuego(pantalla)
-    
-    # Ponemos en marcha el reloj para que aparezcan enemigos cada X tiempo
-    pygame.time.set_timer(CREAR_ENEMIGO, TIEMPO_APARICION)
-    
-    # BUCLE PRINCIPAL (El corazón del programa)
-    ejecutando = True
-    while ejecutando:
-        # Llamamos a la función correspondiente según el estado del juego
-        if juego.estado == MENU: ejecutando = juego.ejecutar_menu()
-        elif juego.estado == JUEGO: ejecutando = juego.ejecutar_juego()
-        elif juego.estado == PAUSA: ejecutando = juego.ejecutar_pausa()
-        elif juego.estado == GAMEOVER: ejecutando = juego.ejecutar_gameover()
+    seguir = True
+    while seguir:
+        if juego.estado_actual == MENU: seguir = juego.controlar_menu()
+        elif juego.estado_actual == JUEGO: seguir = juego.controlar_juego()
+        elif juego.estado_actual == PAUSA: seguir = juego.controlar_pausa()
+        elif juego.estado_actual == GAMEOVER: seguir = juego.controlar_gameover()
         
-        if ejecutando:
-            # Actualizamos la visualización de la pantalla
+        if seguir:
             pygame.display.flip()
-            # Mantenemos la velocidad constante (60 FPS)
-            reloj.tick(FPS)
-    
+            reloj.tick(FOTOGRAMAS_POR_SEGUNDO)
+            
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
-    main()
+    bucle_principal()
