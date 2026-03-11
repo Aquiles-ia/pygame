@@ -20,25 +20,20 @@ class Jugador(pygame.sprite.Sprite):
         self.rect.bottom = ALTO - 20
         
         # Sonido de movimiento (usaremos uno sintético si no hay archivo)
-        self.move_sound = None 
+        self.sonido_movimiento = None 
 
     def update(self):
         teclas = pygame.key.get_pressed()
-        moved = False
+        
+        # Movimiento simple con las flechas
         if teclas[pygame.K_LEFT] and self.rect.left > 0:
             self.rect.x -= VEL_JUGADOR
-            moved = True
         if teclas[pygame.K_RIGHT] and self.rect.right < ANCHO:
             self.rect.x += VEL_JUGADOR
-            moved = True
         if teclas[pygame.K_UP] and self.rect.top > 0:
             self.rect.y -= VEL_JUGADOR
-            moved = True
         if teclas[pygame.K_DOWN] and self.rect.bottom < ALTO:
             self.rect.y += VEL_JUGADOR
-            moved = True
-            
-        return moved
 
     def disparar(self):
         # Crear una bala en la posición actual del jugador
@@ -47,16 +42,17 @@ class Jugador(pygame.sprite.Sprite):
 class Bala(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((10, 10), pygame.SRCALPHA)
-        pygame.draw.circle(self.image, (255, 255, 0), (5, 5), 5) # Bolita amarilla
+        # La bala es un simple rectángulo amarillo de 5x10 píxeles
+        self.image = pygame.Surface((5, 10))
+        self.image.fill((255, 255, 0))
         self.rect = self.image.get_rect()
         self.rect.bottom = y
         self.rect.centerx = x
-        self.speedy = -10 # Velocidad hacia arriba
+        self.velocidad_y = -10 # Sube hacia arriba acelerado
 
     def update(self):
-        # La bala se mueve hacia arriba (restando en el eje Y)
-        self.rect.y += self.speedy
+        # Movemos la bala
+        self.rect.y += self.velocidad_y
         # Si la bala sale por arriba (Y < 0), la borramos para no gastar memoria
         if self.rect.bottom < 0:
             self.kill()
@@ -70,14 +66,14 @@ class Enemigo(pygame.sprite.Sprite):
         self.image = pygame.image.load(ruta_imagen)
         self.image = pygame.transform.scale(self.image, (50, 50))
         self.rect = self.image.get_rect()
-        self.reset_position()
+        self.reiniciar_posicion()
 
-    def reset_position(self):
+    def reiniciar_posicion(self):
         self.rect.x = random.randrange(ANCHO - self.rect.width)
         self.rect.y = random.randrange(-100, -40)
-        self.speedy = random.randrange(1, VEL_ENEMIGO + 2)
+        self.vel_y = VEL_ENEMIGO # Ahora todos van a la misma velocidad fija
 
     def update(self):
-        self.rect.y += self.speedy
+        self.rect.y += self.vel_y
         if self.rect.top > ALTO + 10:
-            self.reset_position()
+            self.reiniciar_posicion()

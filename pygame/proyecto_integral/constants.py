@@ -17,9 +17,11 @@ JUEGO = "JUEGO"
 PAUSA = "PAUSA"
 GAMEOVER = "GAMEOVER"
 
-# Velocidades
+# Ajustes para Principiantes (puedes cambiar los números aquí)
 VEL_JUGADOR = 5
-VEL_ENEMIGO = 3
+VEL_ENEMIGO = 2        # Más lento para empezar
+ENEMIGOS_INICIALES = 2 # Pocas naves al principio
+TIEMPO_APARICION = 8000 # Un enemigo nuevo cada 8 segundos
 
 # Eventos personalizados
 CREAR_ENEMIGO = pygame.USEREVENT + 1
